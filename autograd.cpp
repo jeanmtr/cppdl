@@ -35,10 +35,9 @@ void Value::backward(){
    set<Value*> visited;
    vector<Value*> sorted;
    this->topo_sort(&visited,&sorted);
-   
-   vector<Value*>::reverse_iterator itr;
-   for(itr = sorted.rbegin();itr != sorted.rend();itr++){
-      (*itr)->_backward->apply();
+   std::reverse(sorted.begin(),sorted.end());
+   for(Value* v: sorted){
+      v->_backward->apply();
    }
 }
 
@@ -46,9 +45,22 @@ void Value::backward(){
 
 
 
+void MultBackward::apply(){
+   a->grad = out->grad * b->data;
+   b->grad = out->grad * a->data;
+}
+
+Value* Value::mult(Value* b){
+   Value* out = new Value(data * b->data);
+   out->op = "*";
+   out->_backward = new MultBackward(this,b,out);
+   out->children = {this,b};
+   return out;
+}
 void AddBackward::apply(){
    a->grad = out->grad;
    b->grad = out->grad;
+   cout << "we applied \n";
 }
 
 Value* Value::add(Value* b){
@@ -67,8 +79,22 @@ int main(){
    Value b(33.,"b");
    b.print();
    Value* c = a.add(&b);
-   c->backward();
+   Value d(100.,"d");
+
+   Value f(1.33,"f");
+   Value* e = d.add(&f);
+   Value* g = c->mult(e);
+   c->print();
+   g->backward();
+
+
    a.print();
+   b.print();
+   c->print();
+   d.print();
+   e->print();
+   g->print();
+   f.print();
    cout << "[+] youpi \n";
    return 0;
 }

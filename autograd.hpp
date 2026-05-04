@@ -7,7 +7,7 @@ class BackwardFn {
 };
 
 class Value{
-      BackwardFn* _backward;
+      BackwardFn* _backward = new BackwardFn();
    public:
       double data;
       set<Value*> children;
@@ -20,7 +20,7 @@ class Value{
 
       void print();
       Value* add(Value* b);
-      Value operator*(Value& b);
+      Value* mult(Value* b);
       void topo_sort(set<Value*>* visited, vector<Value*>* sorted);
       void backward();
 };     
@@ -37,4 +37,13 @@ class AddBackward : public BackwardFn {
       void apply() override;
 };
 
+
+class MultBackward: public BackwardFn {
+   Value* a;
+   Value* b;
+   Value* out;
+   public:
+      MultBackward(Value* a, Value* b, Value* out) : a(a), b(b), out(out) {}
+      void apply() override;
+};
 
