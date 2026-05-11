@@ -1,5 +1,5 @@
-#include <bits/stdc++.h>
-using namespace std;
+#include "tensor.hpp"
+#include <set>
 
 class BackwardFn {
    public:
@@ -9,23 +9,46 @@ class BackwardFn {
 class Value{
       BackwardFn* _backward = new BackwardFn();
    public:
-      double data;
-      set<Value*> children;
-      double grad = 0;
-      string op = "";
-      string label;
+      Tensor data;
+      std::set<Value*> children;
+      Tensor grad = Tensor();
+      std::string op = "";
+      std::string label;
       
 
-      Value(double data, string label = "") : data(data), label(label){};
+      Value(Tensor data, std::string label = "") : data(data), label(label){};
 
+      Value(double data, std::string label = "") : data(Tensor()), label(label){
+         this->data.get() = data;
+   };
       void print();
       Value* add(Value* b);
       Value* mult(Value* b);
-      void topo_sort(set<Value*>* visited, vector<Value*>* sorted);
+      Value* mm(Value* b);
+      Value* sigmoid();
+      void topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted);
       void backward();
 };     
     
 
+
+
+
+class SigmoidBackward: public BackwardFn {
+   Value* a;
+   Value* out;
+   public:
+      SigmoidBackward(Value* a, Value* out) : a(a), out(out) {}
+      void apply() override;
+};
+class MMBackward : public BackwardFn {
+   Value* a;
+   Value* b;
+   Value* out;
+   public:
+      MMBackward(Value* a, Value* b, Value* out) : a(a), b(b), out(out) {}
+      void apply() override;
+};
 
 
 class AddBackward : public BackwardFn {

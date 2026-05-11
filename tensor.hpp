@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <assert.h>
+#include <cmath>
 
 
 
@@ -12,12 +13,19 @@ class Tensor{
      std::vector<int> stride;
      int size;
      Tensor(const std::vector<int>& shape);
+     Tensor();
      double& get(const std::vector<int>& pos);
      const double& get(const std::vector<int>& pos) const;
+     double& get();
+     const double& get() const;
      //double get(vector<int> pos); idk
      Tensor operator+(const Tensor& other);
      Tensor operator*(const Tensor& other);
-
+     Tensor mm(const Tensor& other);
+     Tensor sigmoid();
+     Tensor sigmoidDeriv();
+     void printShape();
+     Tensor transpose();
 };
 
 

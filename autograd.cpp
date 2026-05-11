@@ -1,28 +1,32 @@
-#include <bits/stdc++.h>
 #include "autograd.hpp"
+#include <algorithm>
 
 
 void Value::print(){
    if (op.empty()){
-      cout << "["<< label << "]: ";
-      cout << " data =" << data;
-      cout << ", grad =" << grad;
-      cout << ", childrens = " << children.size();
-      cout << "\n";
+      std::cout << "["<< label << "]: ";
+      std::cout << " data =";
+      this->data.printShape();
+      std::cout << ", grad =";
+      this->grad.printShape();
+      std::cout << ", childrens = " << children.size();
+      std::cout << "\n";
    }
    else {
-   cout << "["<< label << "]: ";
-   cout << " data =" << data;
-   cout << ", grad =" << grad;
-   cout << ", childrens = " << children.size();
-   cout << ", op =" << op;
-   cout << "\n";
+   std::cout << "["<< label << "]: ";
+   std::cout << " data =";
+   this->data.printShape();
+   std::cout << ", grad =";
+   this->grad.printShape();
+   std::cout << ", childrens = " << children.size();
+   std::cout << ", op =" << op;
+   std::cout << "\n";
    }
 }
 //there must be a way to keep track of visited nodes better
-void Value::topo_sort(set<Value*>* visited, vector<Value*>* sorted){
+void Value::topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted){
    visited->insert(this);
-   set<Value*>::iterator itr;
+   std::set<Value*>::iterator itr;
    for(itr = children.begin();itr!=children.end();itr++){
       if(!visited->count(*itr)){
          (*itr)->topo_sort(visited, sorted);
@@ -31,9 +35,10 @@ void Value::topo_sort(set<Value*>* visited, vector<Value*>* sorted){
    sorted->push_back(this);
 }
 void Value::backward(){
-   grad = 1;
-   set<Value*> visited;
-   vector<Value*> sorted;
+   grad = Tensor();
+   grad.get() = 1.0;
+   std::set<Value*> visited;
+   std::vector<Value*> sorted;
    this->topo_sort(&visited,&sorted);
    std::reverse(sorted.begin(),sorted.end());
    for(Value* v: sorted){
@@ -60,7 +65,6 @@ Value* Value::mult(Value* b){
 void AddBackward::apply(){
    a->grad = out->grad;
    b->grad = out->grad;
-   cout << "we applied \n";
 }
 
 Value* Value::add(Value* b){
@@ -71,6 +75,31 @@ Value* Value::add(Value* b){
    return out;
 }
 
+void MMBackward::apply(){
+   a->grad = b->data.transpose() * out->grad;
+   b->grad = a->data.transpose() * out->grad;
+}
+
+Value* Value::mm(Value* b){
+   Value* out = new Value(data.mm(b->data));
+   out->op = "mm";
+   out->_backward = new MMBackward(this, b, out);
+   out->children = {this,b};
+   return out;
+}
+
+void SigmoidBackward::apply(){
+   a->grad = a->data.sigmoidDeriv() * out->grad;
+
+}
+
+Value* Value::sigmoid(){
+   Value* out = new Value(data.sigmoid());
+   out->op = "sigmoid";
+   out->_backward = new SigmoidBackward(this, out);
+   out->children = {this};
+   return out;
+}
 
 
 int main(){
@@ -95,6 +124,8 @@ int main(){
    e->print();
    g->print();
    f.print();
-   cout << "[+] youpi \n";
+   std::cout << "[+] youpi \n";
    return 0;
 }
+
+
