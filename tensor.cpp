@@ -1,4 +1,5 @@
 #include "tensor.hpp"
+#include <algorithm>
 
 Tensor::Tensor(const std::vector<int>& shape){
    //jsp si faut pas bloquer le cas {}
@@ -12,14 +13,14 @@ Tensor::Tensor(const std::vector<int>& shape){
       }
    }
    size = shape.empty() ? 1 : stride.back()*shape.back();
-   data = std::vector<double>(size, 0.0);
+   data = std::make_shared<std::vector<double>>(size, 0.0);
 }
 
 Tensor::Tensor(){
    this->shape = {};
    this->stride = {};
    this->size = 1;
-   data = std::vector<double>(1,0.0);
+   data = std::make_shared<std::vector<double>>(1, 0.0);
 }
 
    
@@ -33,7 +34,7 @@ double& Tensor::get(const std::vector<int>& pos){
    for(int i = 0;i<dim;i++){
       sum += pos[i]*this->stride[i];
    }
-   return this->data[sum];
+   return (*data)[sum];
 }
 
 const double& Tensor::get(const std::vector<int>& pos) const{
@@ -46,17 +47,18 @@ const double& Tensor::get(const std::vector<int>& pos) const{
    for(int i = 0;i<dim;i++){
       sum += pos[i]*this->stride[i];
    }
-   return this->data[sum];
+   return (*data)[sum];
 }
 //for scalars
 double& Tensor::get(){
    assert(this->size == 1);
-   return this->data[0];
+   return (*data)[0];
+
 }
 
 const double& Tensor::get() const {
    assert(this->size == 1);
-   return this->data[0];
+   return (*data)[0];
 }
 
 
@@ -85,16 +87,40 @@ void iterate(const std::vector<int>& shape, const std::vector<int>& stride, Func
       }
    }
 }
+//this is a specific case but idk if broader case is needed.
+//i should use exceptions but idk how to use them yet
+Tensor Tensor::broadcast(const std::vector<int>& shape) const{
+   int dim = this->shape.size();
+   int newDim = shape.size();
+   bool oneFlag = false;
+   for(int i = 0; i < newDim;i++){
+      if (i < dim){
+         if (this->shape[dim-1] == 1)
+            oneFlag = true;
+         else
+            assert(this->shape[dim-i] == shape[newDim - i ] && !oneFlag);
+      }
+   }
+   Tensor out(shape);
+   out.data = this->data;
+   return out;
+}
 
-
-//pr le moment on aditionne que les tenseurs de mm shape
-//faudrait implémenter le brodcasting pour des tenseurs pas de mm shape
+//TODO: do try catch block for broadcasting, 
+//rn we only broadcast other so first arg will always be the final shape
 Tensor Tensor::operator+(const Tensor& other){
    int other_dim = other.shape.size();
-   assert(other_dim == this->shape.size());
-   for(int i = 0; i < other_dim;i++){
-      assert(other.shape[i] == this->shape[i]);
+   Tensor broadcasted = other;
+   if(other_dim == this->shape.size()){
+      for(int i = 0; i < other_dim;i++){
+         if(other.shape[i] != this->shape[i]){
+            broadcasted = other.broadcast(this->shape);
+            break;
+         }
+      }
    }
+   else
+      broadcasted = other.broadcast(this->shape);
    Tensor out(this->shape);
    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
       out.get(x) = this->get(x) + other.get(x);

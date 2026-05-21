@@ -2,12 +2,13 @@
 #include <vector>
 #include <assert.h>
 #include <cmath>
+#include <memory>
 
 
 
 //TODO: using templates
 class Tensor{
-   std::vector<double> data;
+   std::shared_ptr<std::vector<double>> data;
   public: 
      std::vector<int> shape;
      std::vector<int> stride;
@@ -26,6 +27,7 @@ class Tensor{
      Tensor sigmoidDeriv();
      void printShape();
      Tensor transpose();
+     Tensor broadcast(const std::vector<int>& shape) const;
 };
 
 
