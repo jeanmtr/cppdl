@@ -93,16 +93,22 @@ Tensor Tensor::broadcast(const std::vector<int>& shape) const{
    int dim = this->shape.size();
    int newDim = shape.size();
    bool oneFlag = false;
+   int firstOne = newDim-dim;
    for(int i = 0; i < newDim;i++){
       if (i < dim){
-         if (this->shape[dim-1] == 1)
+         if (!oneFlag && this->shape[dim-1] == 1){ //why am i checking this
             oneFlag = true;
+            firstOne = dim -i + 1;
+         }
          else
             assert(this->shape[dim-i] == shape[newDim - i ] && !oneFlag);
       }
    }
-   Tensor out(shape);
+   Tensor out(shape); //there might be a problem with the copy TODO
    out.data = this->data;
+   for(int i = 0; i < firstOne; i++){
+      out.stride[i] = 0;
+   }
    return out;
 }
 
@@ -130,10 +136,17 @@ Tensor Tensor::operator+(const Tensor& other){
 
 Tensor Tensor::operator*(const Tensor& other){
    int other_dim = other.shape.size();
-   assert(other_dim == this->shape.size());
-   for(int i = 0; i < other_dim;i++){
-      assert(other.shape[i] == this->shape[i]);
+   Tensor broadcasted = other;
+   if(other_dim == this->shape.size()){
+      for(int i = 0; i < other_dim;i++){
+         if(other.shape[i] != this->shape[i]){
+            broadcasted = other.broadcast(this->shape);
+            break;
+         }
+      }
    }
+   else
+      broadcasted = other.broadcast(this->shape);
    Tensor out(this->shape);
    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
       out.get(x) = this->get(x) * other.get(x);
@@ -141,6 +154,7 @@ Tensor Tensor::operator*(const Tensor& other){
    return out; 
 }
 
+//TODO implement matrix multiplication but for tensors (repeating matrix mult)
 Tensor Tensor::mm(const Tensor& other){
    assert(this->shape.size() == 2 && other.shape.size() == 2);
    int n = this->shape[0];
@@ -185,8 +199,4 @@ void Tensor::printShape(){
       std::cout << "]";
 }
 
-int main(){
-   Tensor aaaa({2,2});
-   std::cout << "nice \n";
-}
 

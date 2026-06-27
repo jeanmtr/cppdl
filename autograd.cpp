@@ -3,25 +3,25 @@
 
 
 void Value::print(){
-   if (op.empty()){
-      std::cout << "["<< label << "]: ";
-      std::cout << " data =";
-      this->data.printShape();
-      std::cout << ", grad =";
-      this->grad.printShape();
-      std::cout << ", childrens = " << children.size();
-      std::cout << "\n";
-   }
-   else {
    std::cout << "["<< label << "]: ";
    std::cout << " data =";
-   this->data.printShape();
-   std::cout << ", grad =";
-   this->grad.printShape();
-   std::cout << ", childrens = " << children.size();
-   std::cout << ", op =" << op;
-   std::cout << "\n";
+   if (data.shape.size() == 0){
+      std::cout << data.get({});
    }
+   else
+      this->data.printShape();
+   std::cout << ", grad =";
+   if (grad.shape.size() == 0){
+      std::cout << grad.get({});
+   }
+   else
+      this->grad.printShape();
+   std::cout << ", childrens = " << children.size();
+      if (!op.empty()){
+   std::cout << ", op =" << op;
+   }
+   std::cout << "\n";
+   
 }
 //there must be a way to keep track of visited nodes better
 void Value::topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted){
