@@ -24,6 +24,7 @@ class Tensor{
      Tensor operator*(const Tensor& other);
      Tensor mm(const Tensor& other);
      Tensor sigmoid();
+     Tensor power(double exp);
      Tensor sigmoidDeriv();
      void printShape();
      Tensor transpose();

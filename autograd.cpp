@@ -17,16 +17,14 @@ void Value::print(){
    else
       this->grad.printShape();
    std::cout << ", childrens = " << children.size();
-      if (!op.empty()){
-   std::cout << ", op =" << op;
-   }
+   std::cout << ", op =" << op->name;
    std::cout << "\n";
    
 }
 //there must be a way to keep track of visited nodes better
 void Value::topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted){
    visited->insert(this);
-   std::set<Value*>::iterator itr;
+   std::vector<Value*>::iterator itr;
    for(itr = children.begin();itr!=children.end();itr++){
       if(!visited->count(*itr)){
          (*itr)->topo_sort(visited, sorted);
@@ -43,7 +41,17 @@ void Value::backward(){
    std::reverse(sorted.begin(),sorted.end());
    for(Value* v: sorted){
       v->print();
-      v->_backward->apply();
+      v->op->backward(v,v->children);
+   }
+}
+
+void Value::forward(){
+   std::set<Value*> visited;
+   std::vector<Value*> sorted;
+   this->topo_sort(&visited,&sorted);
+   for(Value* v: sorted){
+      v->print();
+      v->op->forward(v,v->children);
    }
 }
 
@@ -51,65 +59,37 @@ void Value::backward(){
 
 
 
-void MultBackward::apply(){
-   a->grad = out->grad * b->data;
-   b->grad = out->grad * a->data;
-}
-
 Value* Value::mult(Value* b){
-   Value* out = new Value(data * b->data);
-   out->op = "*";
-   out->_backward = new MultBackward(this,b,out);
+   Value* out = new Value(Tensor());
+   out->op = new MultOP;
    out->children = {this,b};
    return out;
-}
-void AddBackward::apply(){
-   a->grad = out->grad;
-   b->grad = out->grad;
 }
 
 Value* Value::add(Value* b){
-   Value* out = new Value(data + b->data);
-   out->op = "+";
-   out->_backward = new AddBackward(this,b,out);
+   Value* out = new Value(Tensor());
+   out->op = new AddOP;
    out->children = {this,b};
    return out;
 }
 
-void MMBackward::apply(){
-   std::cout << "begin mm bw \n";
-
-   std::cout << "shape 1: ";
-   for (int i: b->data.shape){std::cout << i << ",";}
-   std::cout << "\n" << "shape 2: ";
-   for (int i: out->grad.shape){std::cout << i << ",";}
-   std::cout << "\n";
-   a->grad = out->grad.mm(b->data.transpose()) ;
-   b->grad = a->data.transpose().mm(out->grad);
-}
 
 Value* Value::mm(Value* b){
-   Value* out = new Value(data.mm(b->data));
-   out->op = "mm";
-   out->_backward = new MMBackward(this, b, out);
+   Value* out = new Value(Tensor());
+   out->op = new MmOP;
    out->children = {this,b};
    return out;
 }
 
-void SigmoidBackward::apply(){
-   std::cout << "begin sigmoid backwards \n";
-   a->grad = a->data.sigmoidDeriv() * out->grad;
-
-}
 
 Value* Value::sigmoid(){
-   Value* out = new Value(data.sigmoid());
-   out->op = "sigmoid";
-   out->_backward = new SigmoidBackward(this, out);
+   Value* out = new Value(Tensor());
+   out->op = new SigmoidOP();
    out->children = {this};
    return out;
 }
 
+Value* train(Value* model, std::vector<Tensor> inputs, std::vector<Tensor> outputs, int nSteps);
 
 void testMlp(){
    Value input(Tensor({10,1}),"inputs");
@@ -132,6 +112,8 @@ void testMlp(){
 
    std::cout << "arrays filled with rdm values \n";
    out->backward();
+   out->print();
+   std::cout << out->data.get({0,0}) << "\n";
 }
 
 

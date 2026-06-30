@@ -182,6 +182,15 @@ Tensor Tensor::mm(const Tensor& other){
    return out;
 }
 
+Tensor Tensor::power(double expo){
+   Tensor out(this->shape);
+   iterate(out.shape,out.stride,[&](int offset, const std::vector<int>& x){
+      out.get(x) = pow(this->get(x),expo);
+   });
+   return out;
+}
+
+
 Tensor Tensor::sigmoid(){
    Tensor out(this->shape);
    iterate(out.shape,out.stride,[&](int offset, const std::vector<int>& x){

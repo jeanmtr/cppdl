@@ -1,18 +1,21 @@
 #include "tensor.hpp"
 #include <set>
 
-class BackwardFn {
+class Value;
+class Op {
    public:
-      virtual void apply(){};
+      std::string name = "";
+      virtual void forward(Value* out, std::vector<Value*>& inputs) = 0;
+      virtual void backward(Value* out, std::vector<Value*>& inputs) = 0;
+      
 };
 
 class Value{
-      BackwardFn* _backward = new BackwardFn();
+      Op* op = nullptr;
    public:
       Tensor data;
-      std::set<Value*> children;
+      std::vector<Value*> children;
       Tensor grad = Tensor();
-      std::string op = "";
       std::string label;
       
 
@@ -28,45 +31,55 @@ class Value{
       Value* sigmoid();
       void topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted);
       void backward();
+      void forward();
 };     
     
+Value* train(Value* model, std::vector<Tensor> inputs, std::vector<Tensor> outputs, int nSteps);
 
 
 
-
-class SigmoidBackward: public BackwardFn {
-   Value* a;
-   Value* out;
-   public:
-      SigmoidBackward(Value* a, Value* out) : a(a), out(out) {}
-      void apply() override;
-};
-class MMBackward : public BackwardFn {
-   Value* a;
-   Value* b;
-   Value* out;
-   public:
-      MMBackward(Value* a, Value* b, Value* out) : a(a), b(b), out(out) {}
-      void apply() override;
+struct SigmoidOP: public Op {
+   std::string name = "sigmoid";
+   void forward(Value* out, std::vector<Value*>& inputs){
+      out->data = inputs[0]->data.sigmoid();
+   }
+   void backward(Value* out, std::vector<Value*>& inputs){
+      inputs[0]->grad = inputs[0]->data.sigmoidDeriv() * out->grad;
+   }
 };
 
 
-class AddBackward : public BackwardFn {
-   Value* a;
-   Value* b;
-   Value* out;
-   public:
-      AddBackward(Value* a, Value* b, Value* out) : a(a), b(b), out(out) {}
-      void apply() override;
+struct MmOP: public Op {
+   std::string name = "matmult";
+   void forward(Value* out, std::vector<Value*>& inputs){
+      out->data = inputs[0]->data.mm(inputs[1]->data);
+   }
+   void backward(Value* out, std::vector<Value*>& inputs){
+      inputs[0]->grad = out->grad.mm(inputs[1]->data.transpose()) ;
+      inputs[1]->grad = inputs[0]->data.transpose().mm(out->grad);
+   }
 };
 
 
-class MultBackward: public BackwardFn {
-   Value* a;
-   Value* b;
-   Value* out;
-   public:
-      MultBackward(Value* a, Value* b, Value* out) : a(a), b(b), out(out) {}
-      void apply() override;
+struct AddOP: public Op {
+   std::string name = "add";
+   void forward(Value* out, std::vector<Value*>& inputs){
+      out->data = inputs[0]->data + inputs[1]->data;
+   }
+   void backward(Value* out, std::vector<Value*>& inputs){
+      inputs[0]->grad = out->grad;
+      inputs[0]->grad = out->grad;
+   }
 };
 
+
+struct MultOP: public Op {
+   std::string name = "mult";
+   void forward(Value* out, std::vector<Value*>& inputs){
+      out->data = inputs[0]->data * inputs[1]->data;
+   }
+   void backward(Value* out, std::vector<Value*>& inputs){
+      inputs[0]->grad = out->grad * inputs[1]->data;
+      inputs[1]->grad = out->grad * inputs[0]->data;
+   }
+};
