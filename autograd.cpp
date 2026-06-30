@@ -42,6 +42,7 @@ void Value::backward(){
    this->topo_sort(&visited,&sorted);
    std::reverse(sorted.begin(),sorted.end());
    for(Value* v: sorted){
+      v->print();
       v->_backward->apply();
    }
 }
@@ -76,8 +77,15 @@ Value* Value::add(Value* b){
 }
 
 void MMBackward::apply(){
-   a->grad = b->data.transpose() * out->grad;
-   b->grad = a->data.transpose() * out->grad;
+   std::cout << "begin mm bw \n";
+
+   std::cout << "shape 1: ";
+   for (int i: b->data.shape){std::cout << i << ",";}
+   std::cout << "\n" << "shape 2: ";
+   for (int i: out->grad.shape){std::cout << i << ",";}
+   std::cout << "\n";
+   a->grad = out->grad.mm(b->data.transpose()) ;
+   b->grad = a->data.transpose().mm(out->grad);
 }
 
 Value* Value::mm(Value* b){
@@ -89,6 +97,7 @@ Value* Value::mm(Value* b){
 }
 
 void SigmoidBackward::apply(){
+   std::cout << "begin sigmoid backwards \n";
    a->grad = a->data.sigmoidDeriv() * out->grad;
 
 }
@@ -100,6 +109,31 @@ Value* Value::sigmoid(){
    out->children = {this};
    return out;
 }
+
+
+void testMlp(){
+   Value input(Tensor({10,1}),"inputs");
+   Value w1(Tensor({10,10}), "w1");
+   Value w2(Tensor({7,10}), "w2");
+   Value w3(Tensor({5,7}), "w3");
+   Value w4(Tensor({1,5}), "w4");
+
+   Value* l1 = w1.mm(&input)->sigmoid();
+   Value* l2 = w2.mm(l1)->sigmoid();
+   Value* l3 = w3.mm(l2)->sigmoid();
+   Value* l4 = w4.mm(l3)->sigmoid();
+   Value* out = l4->sigmoid();
+   out->print();
+   std::cout << "we be done with the graph \n";
+   w1.data.fillRandom();
+   w2.data.fillRandom();
+   w3.data.fillRandom();
+   w4.data.fillRandom();
+
+   std::cout << "arrays filled with rdm values \n";
+   out->backward();
+}
+
 
 
 int main(){
@@ -125,6 +159,7 @@ int main(){
    g->print();
    f.print();
    std::cout << "[+] youpi \n";
+   testMlp();
    return 0;
 }
 

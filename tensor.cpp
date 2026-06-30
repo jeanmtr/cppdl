@@ -12,14 +12,14 @@ Tensor::Tensor(const std::vector<int>& shape){
          stride.push_back(stride[i-1]*shape[i-1]);
       }
    }
-   size = shape.empty() ? 1 : stride.back()*shape.back();
-   data = std::make_shared<std::vector<double>>(size, 0.0);
+   dim = shape.empty() ? 1 : stride.back()*shape.back();
+   data = std::make_shared<std::vector<double>>(dim, 0.0);
 }
 
 Tensor::Tensor(){
    this->shape = {};
    this->stride = {};
-   this->size = 1;
+   this->dim = 1;
    data = std::make_shared<std::vector<double>>(1, 0.0);
 }
 
@@ -51,13 +51,13 @@ const double& Tensor::get(const std::vector<int>& pos) const{
 }
 //for scalars
 double& Tensor::get(){
-   assert(this->size == 1);
+   assert(this->dim == 1);
    return (*data)[0];
 
 }
 
 const double& Tensor::get() const {
-   assert(this->size == 1);
+   assert(this->dim == 1);
    return (*data)[0];
 }
 
@@ -89,19 +89,31 @@ void iterate(const std::vector<int>& shape, const std::vector<int>& stride, Func
 }
 //this is a specific case but idk if broader case is needed.
 //i should use exceptions but idk how to use them yet
+// there might be an issue if dim > newDim but idk how that might happen
 Tensor Tensor::broadcast(const std::vector<int>& shape) const{
+   std::cout << "attempting to broadcast tensors of shape: \n";
+   std::cout << "shape 1 (the one being broadcasted): ";
+   for (int i: this->shape){std::cout << i << ",";}
+   std::cout << "\n" << "shape 2: ";
+   for (int i: shape){std::cout << i << ",";}
+   std::cout << "\n";
    int dim = this->shape.size();
    int newDim = shape.size();
+   std::cout << dim << "," << newDim << "\n";
    bool oneFlag = false;
    int firstOne = newDim-dim;
-   for(int i = 0; i < newDim;i++){
-      if (i < dim){
-         if (!oneFlag && this->shape[dim-1] == 1){ //why am i checking this
+   for(int i = 1; i <= dim;i++){
+      if (this->shape[dim-i] == shape[newDim - i ] && !oneFlag){std::cout<<"a\n";}
+      else if(this->shape[dim-i] == 1){ //why am i checking this
+         if (!oneFlag){
+            std::cout << "b\n";
             oneFlag = true;
             firstOne = dim -i + 1;
          }
-         else
-            assert(this->shape[dim-i] == shape[newDim - i ] && !oneFlag);
+      }
+      else {
+         std::cout << "could not broadcast tensors. \n ";
+         std::exit(1);
       }
    }
    Tensor out(shape); //there might be a problem with the copy TODO
@@ -129,7 +141,7 @@ Tensor Tensor::operator+(const Tensor& other){
       broadcasted = other.broadcast(this->shape);
    Tensor out(this->shape);
    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
-      out.get(x) = this->get(x) + other.get(x);
+      out.get(x) = this->get(x) + broadcasted.get(x);
    });
    return out; 
 }
@@ -149,19 +161,21 @@ Tensor Tensor::operator*(const Tensor& other){
       broadcasted = other.broadcast(this->shape);
    Tensor out(this->shape);
    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
-      out.get(x) = this->get(x) * other.get(x);
+      out.get(x) = this->get(x) * broadcasted.get(x);
    });
    return out; 
 }
 
 //TODO implement matrix multiplication but for tensors (repeating matrix mult)
 Tensor Tensor::mm(const Tensor& other){
+   std::cout << "doing mm \n";
    assert(this->shape.size() == 2 && other.shape.size() == 2);
-   int n = this->shape[0];
+   int n = this->shape[1];
    assert(this->shape[1] == other.shape[0]);
-   Tensor out({this->shape[1],other.shape[1]});
+   Tensor out({this->shape[0],other.shape[1]});
    iterate(out.shape,out.stride,[&](int offset,const std::vector<int>& x){
       for(int i = 0;i<n;i++){
+         //std::cout << x[0] << "," << x[1] << "," << i << "\n";
          out.get(x) += this->get({x[0],i})*other.get({i,x[1]});
       }
    });
@@ -181,6 +195,7 @@ Tensor Tensor::sigmoidDeriv(){
    iterate(out.shape,out.stride,[&](int offset, const std::vector<int>& x){
       out.get(x) = exp(-this->get(x))/pow(1 + exp(-this->get(x)),2);
    });
+   std::cout << "end of deriv\n";
    return out;
 }
 //not sure this makes a reference to data.
@@ -192,11 +207,22 @@ Tensor Tensor::transpose(){
    return out;
 }
 void Tensor::printShape(){
-      std::cout << "[";
-      for(const int& i: this->shape){
-         std::cout << i;
-      }
-      std::cout << "]";
+   std::cout << "[";
+   for(const int& i: this->shape){
+      std::cout << i;
+   }
+   std::cout << "]";
 }
 
+
+void Tensor::fillRandom(){
+    std::mt19937_64 rng(std::random_device{}());
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
+       std::cout << x[0] << "," << x[1] << "\n";
+       this->get(x) = dist(rng);
+   });
+   std::cout << "\n";
+}
 

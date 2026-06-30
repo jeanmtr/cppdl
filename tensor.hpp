@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <cmath>
 #include <memory>
-
+#include <random>
 
 
 //TODO: using templates
@@ -12,7 +12,7 @@ class Tensor{
   public: 
      std::vector<int> shape;
      std::vector<int> stride;
-     int size;
+     int dim;
      Tensor(const std::vector<int>& shape);
      Tensor();
      double& get(const std::vector<int>& pos);
@@ -28,6 +28,7 @@ class Tensor{
      void printShape();
      Tensor transpose();
      Tensor broadcast(const std::vector<int>& shape) const;
+     void fillRandom();
 };
 
 
