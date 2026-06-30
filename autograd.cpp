@@ -38,6 +38,7 @@ void Value::backward(){
    std::set<Value*> visited;
    std::vector<Value*> sorted;
    this->topo_sort(&visited,&sorted);
+   for (Value* v : sorted) v->grad = Tensor(); // set to 0, this might cause brodcasting issues later
    std::reverse(sorted.begin(),sorted.end());
    for(Value* v: sorted){
       v->print();

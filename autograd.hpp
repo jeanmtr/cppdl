@@ -44,7 +44,7 @@ struct SigmoidOP: public Op {
       out->data = inputs[0]->data.sigmoid();
    }
    void backward(Value* out, std::vector<Value*>& inputs){
-      inputs[0]->grad = inputs[0]->data.sigmoidDeriv() * out->grad;
+      inputs[0]->grad = inputs[0]->data.sigmoidDeriv() * out->grad + inputs[0]->grad;
    }
 };
 
@@ -55,8 +55,8 @@ struct MmOP: public Op {
       out->data = inputs[0]->data.mm(inputs[1]->data);
    }
    void backward(Value* out, std::vector<Value*>& inputs){
-      inputs[0]->grad = out->grad.mm(inputs[1]->data.transpose()) ;
-      inputs[1]->grad = inputs[0]->data.transpose().mm(out->grad);
+      inputs[0]->grad = out->grad.mm(inputs[1]->data.transpose()) + inputs[0]->grad;
+      inputs[1]->grad = inputs[0]->data.transpose().mm(out->grad)+ inputs[1]->grad;
    }
 };
 
@@ -67,8 +67,8 @@ struct AddOP: public Op {
       out->data = inputs[0]->data + inputs[1]->data;
    }
    void backward(Value* out, std::vector<Value*>& inputs){
-      inputs[0]->grad = out->grad;
-      inputs[0]->grad = out->grad;
+      inputs[0]->grad = out->grad + inputs[0]->grad;
+      inputs[0]->grad = out->grad + inputs[1]->grad;
    }
 };
 
@@ -79,7 +79,7 @@ struct MultOP: public Op {
       out->data = inputs[0]->data * inputs[1]->data;
    }
    void backward(Value* out, std::vector<Value*>& inputs){
-      inputs[0]->grad = out->grad * inputs[1]->data;
-      inputs[1]->grad = out->grad * inputs[0]->data;
+      inputs[0]->grad = out->grad * inputs[1]->data + inputs[0]->grad;
+      inputs[1]->grad = out->grad * inputs[0]->data + inputs[1]->grad;
    }
 };
