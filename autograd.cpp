@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
 void Value::print(){
    std::cout << "["<< label << "]: ";
@@ -37,11 +38,12 @@ void Value::backward(){
    std::set<Value*> visited;
    std::vector<Value*> sorted;
    this->topo_sort(&visited,&sorted);
-   for (Value* v : sorted) v->grad = Tensor(); // set to 0, this might cause brodcasting issues later
+   //for (Value* v : sorted) v->grad = Tensor(); // set to 0, this might cause brodcasting issues later
+   this->grad = Tensor();
    grad.get() = 1.0;
    std::reverse(sorted.begin(),sorted.end());
    for(Value* v: sorted){
-      v->print();
+      //v->print();
       v->op->backward(v,v->children);
    }
 }
@@ -51,8 +53,8 @@ void Value::forward(){
    std::vector<Value*> sorted;
    this->topo_sort(&visited,&sorted);
    for(Value* v: sorted){
-      v->print();
       v->op->forward(v,v->children);
+      //v->print();
    }
 }
 
@@ -95,9 +97,22 @@ Value* Value::sigmoid(){
    out->children = {this};
    return out;
 }
+Value* Value::sum(){
+   Value* out = new Value(Tensor());
+   out->op = new SumOP();
+   out->children = {this};
+   return out;
+}
+Value* Value::power(double expo){
+   Value* out = new Value(Tensor());
+   out->op = new PowerOP(expo);
+   out->children = {this};
+   return out;
+}
 // TODO: implement batching bc this is sad
 void train(Model& model, std::vector<Value*> inputs, std::vector<Value*> targets, int nSteps, LossFn loss_fun){
-   double alpha = 0.1;
+   auto start = std::chrono::steady_clock::now();
+   double alpha = 0.0005;
    Value* current_input = inputs[0];
    Value* output = model.create(current_input); //this does not work, faut changer
    Value* loss = loss_fun(output,targets[0]);
@@ -105,44 +120,42 @@ void train(Model& model, std::vector<Value*> inputs, std::vector<Value*> targets
       std::cout << "############## step no :" << i << "\n";
       model.zeroGrad();
       for (int j = 0; j < inputs.size(); j++){
+
+         auto start_time = std::chrono::steady_clock::now();
          output = model.create(inputs[j]);
+         
          loss = loss_fun(output,targets[j]);
+         auto creation_time = std::chrono::steady_clock::now();
          loss->forward();
-         std::cout << "loss for input " << j << "is :" << loss->data.get({0,0}) << "\n";
+         auto forward_time = std::chrono::steady_clock::now();
+         std::cout << "loss for input " << j << "is :" << loss->data.get() << "guess was : [";
+         int target_val = 0;
+         for(int k = 0; k < 10; k++){
+            std::cout << output->data.get({k,0}) << ",";
+            if (targets[j]->data.get({k,0}) == 1)
+               target_val = k;
+         }
+         std::cout << "] expected was: " << target_val << "\n";
          loss->backward();
+         auto backward_time = std::chrono::steady_clock::now();
+
+
+         auto creation_duration = std::chrono::duration_cast<std::chrono::milliseconds>(creation_time - start_time);
+         auto forward_duration = std::chrono::duration_cast<std::chrono::milliseconds>(forward_time - creation_time);
+         auto backward_duration = std::chrono::duration_cast<std::chrono::milliseconds>(backward_time - forward_time);
+         std::cout << "creation took: " << creation_duration.count() << "forward took : " << forward_duration.count() << "backward took : " << backward_duration.count() << "\n";
+   
       }
       for(Value* v: model.params()){
-         v->data = v->data + v->grad * alpha;
+         v->data = v->data - v->grad * alpha;
       }
-      
+
+   auto end = std::chrono::steady_clock::now();
+   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+   std::cout << "Training took " << duration.count() << " ms." << "\n";
    }
 }
 
-void testMlp(){
-   Value input(Tensor({10,1}),"inputs");
-   Value w1(Tensor({10,10}), "w1");
-   Value w2(Tensor({7,10}), "w2");
-   Value w3(Tensor({5,7}), "w3");
-   Value w4(Tensor({1,5}), "w4");
-
-   Value* l1 = w1.mm(&input)->sigmoid();
-   Value* l2 = w2.mm(l1)->sigmoid();
-   Value* l3 = w3.mm(l2)->sigmoid();
-   Value* l4 = w4.mm(l3)->sigmoid();
-   Value* out = l4->sigmoid();
-   out->forward();
-   out->print();
-   std::cout << "we be done with the graph \n";
-   w1.data.fillRandom();
-   w2.data.fillRandom();
-   w3.data.fillRandom();
-   w4.data.fillRandom();
-
-   std::cout << "arrays filled with rdm values \n";
-   out->backward();
-   out->print();
-   std::cout << out->data.get({0,0}) << "\n";
-}
 struct Dataset{
    std::vector<Value*> training_in;
    std::vector<Value*> training_out;
@@ -152,10 +165,11 @@ struct Dataset{
 
 
 Dataset mnistToValue(){
+   std::cout << "[+] Reading inputs \n";
    Dataset result;
    std::ifstream file("./mnist.csv");
    std::string line;
-   int trainingLen = 1000;
+   int trainingLen = 100;
    std::getline(file, line); // skip header row if present
    int lineCount = 0;
     while (std::getline(file, line)) {
@@ -163,26 +177,28 @@ Dataset mnistToValue(){
         std::string cell;
         bool firstCol = true;
         lineCount ++;
-        Value* img = new Value(Tensor({784}));
-        Value* numVector = new Value(Tensor({10}));
+        Value* img = new Value(Tensor({784, 1}));
+        Value* numVector = new Value(Tensor({10, 1}));
         int pxCount = 0;
         while (std::getline(ss, cell, ',')) {
            
-            if (firstCol) {
+            if (pxCount == 784) {
+               int num = std::stoi(cell);
                if(lineCount < trainingLen){
-                  numVector->data.get({std::stoi(cell)}) = 1.0;
+                  numVector->data.get({num, 0}) = 1.0;
                   result.training_out.push_back(numVector);
                   }
                else{
-                  numVector->data.get({std::stoi(cell)}) = 1.0;
+                  numVector->data.get({num, 0}) = 1.0;
                   result.test_out.push_back(numVector);
                   }
                   
-               firstCol = false;
-            } else {
-                img->data.get({pxCount}) = std::stof(cell) / 255.0;
-                pxCount ++;
             }
+
+            else {
+                img->data.get({pxCount, 0}) = std::stoi(cell) / 255.0;
+            }
+            pxCount ++;
         }
          
          if(lineCount < trainingLen)
@@ -190,6 +206,7 @@ Dataset mnistToValue(){
          else
             result.test_in.push_back(img);
     }
+    std::cout << "[+] successfully read csv \n";
     return result;
 }
 
@@ -197,15 +214,14 @@ Dataset mnistToValue(){
 void testTrain(){
    Dataset ds = mnistToValue();
    LossFn mse = [](Value* pred, Value* target) {
-      //here we assume that output shape is always a n*1*...*1 vector, this should be addressed
-      int len = target->data.shape[0];
-      Value addVal(Tensor({1,len}));
-      addVal.data = addVal.data + 1;
-      Value* diff = addVal.mm(pred->sub(target));
-      return diff->mult(diff);  // (pred - target)²
+      Value* diff = pred->sub(target)->power(2)->sum();
+      return diff;  // (pred - target)²
 };
+   std::cout << "[+] defining the model \n"; 
    MLP model;
-   train(model, ds.training_in, ds.training_out, 100, mse);
+   std::cout << "[+] sucessfully defined the model, beginning the training \n"; 
+   
+   train(model, ds.training_in, ds.training_out, 10, mse);
    
 }
 

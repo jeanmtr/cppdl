@@ -5,12 +5,13 @@ class Value;
 class Op {
    public:
       std::string name = "";
+      double param;
       virtual void forward(Value* out, std::vector<Value*>& inputs) = 0;
       virtual void backward(Value* out, std::vector<Value*>& inputs) = 0;
       
 };
 struct NoOP: public Op {
-   std::string name = "no op";
+   NoOP() {name = "leaf node";}
    void forward(Value* out, std::vector<Value*>& inputs){
    }
    void backward(Value* out, std::vector<Value*>& inputs){
@@ -37,6 +38,8 @@ class Value{
       Value* sub(Value* b);
       Value* mult(Value* b);
       Value* mm(Value* b);
+      Value* sum();
+      Value* power(double expo);
       Value* sigmoid();
       void topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted);
       void backward();
@@ -50,7 +53,7 @@ using LossFn = std::function<Value*(Value*, Value*)>;
 
 
 struct SigmoidOP: public Op {
-   std::string name = "sigmoid";
+   SigmoidOP(){name = "sigmoid";}
    void forward(Value* out, std::vector<Value*>& inputs){
       out->data = inputs[0]->data.sigmoid();
    }
@@ -58,10 +61,28 @@ struct SigmoidOP: public Op {
       inputs[0]->grad = inputs[0]->data.sigmoidDeriv() * out->grad + inputs[0]->grad;
    }
 };
+struct SumOP: public Op {
+   SumOP(){name = "sum";}
+   void forward(Value* out, std::vector<Value*>& inputs){
+      out->data = inputs[0]->data.sum() ;
+   }
+   void backward(Value* out, std::vector<Value*>& inputs){
+      inputs[0]->grad = Tensor({inputs[0]->data.shape}) + out->grad + inputs[0]->grad;
+   }
+};
+struct PowerOP: public Op {
+   PowerOP(double expo){name = "power"; param = expo;}
+   void forward(Value* out, std::vector<Value*>& inputs){
+      out->data = inputs[0]->data.power(param);
+   }
+   void backward(Value* out, std::vector<Value*>& inputs){
+      inputs[0]->grad = inputs[0]->data.power(param - 1) * out->grad * param + inputs[0]->grad;
+   }
+};
 
 
 struct MmOP: public Op {
-   std::string name = "matmult";
+   MmOP(){name = "matmult";}
    void forward(Value* out, std::vector<Value*>& inputs){
       out->data = inputs[0]->data.mm(inputs[1]->data);
    }
@@ -73,29 +94,29 @@ struct MmOP: public Op {
 
 
 struct AddOP: public Op {
-   std::string name = "add";
+   AddOP(){name = "add";}
    void forward(Value* out, std::vector<Value*>& inputs){
       out->data = inputs[0]->data + inputs[1]->data;
    }
    void backward(Value* out, std::vector<Value*>& inputs){
       inputs[0]->grad = out->grad + inputs[0]->grad;
-      inputs[0]->grad = out->grad + inputs[1]->grad;
+      inputs[1]->grad = out->grad + inputs[1]->grad;
    }
 };
 
 struct SubOP: public Op {
-   std::string name = "sub";
+   SubOP(){name = "sub";}
    void forward(Value* out, std::vector<Value*>& inputs){
       out->data = inputs[0]->data - inputs[1]->data;
    }
    void backward(Value* out, std::vector<Value*>& inputs){
       inputs[0]->grad = out->grad + inputs[0]->grad;
-      inputs[0]->grad = -out->grad + inputs[1]->grad;
+      inputs[1]->grad = -out->grad + inputs[1]->grad;
    }
 };
 
 struct MultOP: public Op {
-   std::string name = "mult";
+   MultOP() {name = "mult";}
    void forward(Value* out, std::vector<Value*>& inputs){
       out->data = inputs[0]->data * inputs[1]->data;
    }
@@ -123,18 +144,27 @@ public:
     Value* w1;
     Value* w2;
     Value* w3;
+    Value* b1;
+    Value* b2;
+    Value* b3;
 
     MLP() {
         w1 = new Value(Tensor({784,784}), "w1");
         w2 = new Value(Tensor({100,784}), "w2");
         w3 = new Value(Tensor({10,100}), "w3");
+        b1 = new Value(Tensor({784,1}), "b1");
+        b2 = new Value(Tensor({100,1}), "b2");
+        b3 = new Value(Tensor({10,1}), "b3");
         w1->data.fillRandom();
         w2->data.fillRandom();
         w3->data.fillRandom();
+        b1->data.fillRandom();
+        b2->data.fillRandom();
+        b3->data.fillRandom();
     }
 
     Value* create(Value* input) override {
-        return w3->mm(w2->mm(w1->mm(input)->sigmoid())->sigmoid())->sigmoid();
+        return w3->mm(w2->mm(w1->mm(input)->add(b1)->sigmoid())->add(b2)->sigmoid())->add(b3)->sigmoid();
     }
 
     std::vector<Value*> params() override {

@@ -1,6 +1,5 @@
 #include "tensor.hpp"
 #include <algorithm>
-
 Tensor::Tensor(const std::vector<int>& shape){
    //jsp si faut pas bloquer le cas {}
    this->shape = shape;
@@ -91,22 +90,14 @@ void iterate(const std::vector<int>& shape, const std::vector<int>& stride, Func
 //i should use exceptions but idk how to use them yet
 // there might be an issue if dim > newDim but idk how that might happen
 Tensor Tensor::broadcast(const std::vector<int>& shape) const{
-   std::cout << "attempting to broadcast tensors of shape: \n";
-   std::cout << "shape 1 (the one being broadcasted): ";
-   for (int i: this->shape){std::cout << i << ",";}
-   std::cout << "\n" << "shape 2: ";
-   for (int i: shape){std::cout << i << ",";}
-   std::cout << "\n";
    int dim = this->shape.size();
    int newDim = shape.size();
-   std::cout << dim << "," << newDim << "\n";
    bool oneFlag = false;
    int firstOne = newDim-dim;
    for(int i = 1; i <= dim;i++){
       if (this->shape[dim-i] == shape[newDim - i ] && !oneFlag){std::cout<<"a\n";}
       else if(this->shape[dim-i] == 1){ //why am i checking this
          if (!oneFlag){
-            std::cout << "b\n";
             oneFlag = true;
             firstOne = dim -i + 1;
          }
@@ -161,7 +152,7 @@ Tensor Tensor::operator-(const Tensor& other){
       broadcasted = other.broadcast(this->shape);
    Tensor out(this->shape);
    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
-      out.get(x) = this->get(x) + broadcasted.get(x);
+      out.get(x) = this->get(x) - broadcasted.get(x);
    });
    return out; 
 }
@@ -197,8 +188,10 @@ Tensor Tensor::operator*(const Tensor& other){
          }
       }
    }
-   else
+   else{
       broadcasted = other.broadcast(this->shape);
+      
+   }
    Tensor out(this->shape);
    iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
       out.get(x) = this->get(x) * broadcasted.get(x);
@@ -208,7 +201,6 @@ Tensor Tensor::operator*(const Tensor& other){
 
 //TODO implement matrix multiplication but for tensors (repeating matrix mult)
 Tensor Tensor::mm(const Tensor& other){
-   std::cout << "doing mm \n";
    assert(this->shape.size() == 2 && other.shape.size() == 2);
    int n = this->shape[1];
    assert(this->shape[1] == other.shape[0]);
@@ -244,7 +236,16 @@ Tensor Tensor::sigmoidDeriv(){
    iterate(out.shape,out.stride,[&](int offset, const std::vector<int>& x){
       out.get(x) = exp(-this->get(x))/pow(1 + exp(-this->get(x)),2);
    });
-   std::cout << "end of deriv\n";
+   return out;
+}
+
+Tensor Tensor::sum(){
+   double acc = 0;
+   iterate(this->shape,this->stride,[&](int offset, const std::vector<int>& x){
+      acc += this->get(x);
+   });
+   Tensor out;
+   out.get() = acc;
    return out;
 }
 //not sure this makes a reference to data.
@@ -258,7 +259,7 @@ Tensor Tensor::transpose(){
 void Tensor::printShape(){
    std::cout << "[";
    for(const int& i: this->shape){
-      std::cout << i;
+      std::cout << i << ", ";
    }
    std::cout << "]";
 }
@@ -266,10 +267,9 @@ void Tensor::printShape(){
 
 void Tensor::fillRandom(){
     std::mt19937_64 rng(std::random_device{}());
-    std::uniform_real_distribution<double> dist(0.0, 1.0);
+    std::uniform_real_distribution<double> dist(-0.1, 0.1);
 
     iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
-       std::cout << x[0] << "," << x[1] << "\n";
        this->get(x) = dist(rng);
    });
    std::cout << "\n";
