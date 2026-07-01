@@ -21,7 +21,11 @@ class Tensor{
      const double& get() const;
      //double get(vector<int> pos); idk
      Tensor operator+(const Tensor& other);
+     Tensor operator+(const double other);
      Tensor operator*(const Tensor& other);
+     Tensor operator*(const double other);
+     Tensor operator-(const Tensor& other);
+     Tensor operator-();
      Tensor mm(const Tensor& other);
      Tensor sigmoid();
      Tensor power(double exp);

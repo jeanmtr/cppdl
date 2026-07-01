@@ -146,6 +146,46 @@ Tensor Tensor::operator+(const Tensor& other){
    return out; 
 }
 
+Tensor Tensor::operator-(const Tensor& other){
+   int other_dim = other.shape.size();
+   Tensor broadcasted = other;
+   if(other_dim == this->shape.size()){
+      for(int i = 0; i < other_dim;i++){
+         if(other.shape[i] != this->shape[i]){
+            broadcasted = other.broadcast(this->shape);
+            break;
+         }
+      }
+   }
+   else
+      broadcasted = other.broadcast(this->shape);
+   Tensor out(this->shape);
+   iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
+      out.get(x) = this->get(x) + broadcasted.get(x);
+   });
+   return out; 
+}
+Tensor Tensor::operator-(){
+   Tensor out(this->shape);
+   iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
+      out.get(x) = -this->get(x);
+   });
+   return out; 
+}
+Tensor Tensor::operator+(const double other){
+   Tensor out(this->shape);
+   iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
+      out.get(x) = this->get(x) + other;
+   });
+   return out; 
+}
+Tensor Tensor::operator*(const double other){
+   Tensor out(this->shape);
+   iterate(this->shape,this->stride, [&](int offset, const std::vector<int>& x){
+      out.get(x) = this->get(x) * other;
+   });
+   return out; 
+}
 Tensor Tensor::operator*(const Tensor& other){
    int other_dim = other.shape.size();
    Tensor broadcasted = other;
