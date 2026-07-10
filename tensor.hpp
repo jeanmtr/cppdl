@@ -19,6 +19,7 @@ class Tensor{
      const double& get(const std::vector<int>& pos) const;
      double& get();
      const double& get() const;
+     int effectiveDim();
      //double get(vector<int> pos); idk
      Tensor operator+(const Tensor& other);
      Tensor operator+(const double other);
