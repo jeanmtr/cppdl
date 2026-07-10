@@ -1,5 +1,4 @@
 #include "tensor.hpp"
-#include <algorithm>
 Tensor::Tensor(const std::vector<int> &shape) {
   // jsp si faut pas bloquer le cas {}
   this->shape = shape;
