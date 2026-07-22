@@ -1,4 +1,5 @@
 #include "tensor.hpp"
+#include <algorithm>
 Tensor::Tensor(const std::vector<int> &shape) {
   // jsp si faut pas bloquer le cas {}
   this->shape = shape;
@@ -303,13 +304,24 @@ Tensor Tensor::sum() {
   return out;
 }
 
-//axes should be a set but who likes sets ?
 Tensor Tensor::sum(std::vector<int> axes) {
+  std::sort(axes.begin(),axes.end());
+  std::vector<int> outShape;
+  for(int v: outShape){
+    outShape.push_back(this->shape[v]);
+  }
+  Tensor out(outShape);
   double acc = 0;
   iterate(this->shape, this->stride,
-          [&](int offset, const std::vector<int> &x) { acc += this->get(x); });
-  Tensor out;
-  out.get() = acc;
+          [&](int offset, const std::vector<int> &x) {
+            std::vector<int> currentIndex;
+            for(int v: outShape){
+              currentIndex.push_back(x[v]);
+            }
+            out.get(currentIndex) = this->get(x);
+
+
+          });
   return out;
 }
 // not sure this makes a reference to data.

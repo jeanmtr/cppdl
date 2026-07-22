@@ -44,6 +44,7 @@ class Value{
       void topo_sort(std::set<Value*>* visited, std::vector<Value*>* sorted);
       void backward();
       void forward();
+      void reduce();
 };
 
 using LossFn = std::function<Value*(Value*, Value*)>;
@@ -125,6 +126,7 @@ struct MultOP: public Op {
       inputs[1]->grad = out->grad * inputs[0]->data + inputs[1]->grad;
    }
 };
+
 
 
 class Model{

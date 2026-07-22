@@ -32,6 +32,22 @@ void Value::topo_sort(std::set<Value *> *visited,
   }
   sorted->push_back(this);
 }
+
+void Value::reduce() {
+  int dataDim = this->data.shape.size();
+  int gradDim = this->grad.shape.size();
+  std::vector<int> dimsToKeep;
+  for(int i = 0; i < dataDim; i++){
+    if(this->data.shape[i] == 1){
+      dimsToKeep.push_back(i +gradDim - dataDim);
+    }
+
+  }
+  for(int i = 0;i < gradDim - dataDim; i++){
+    dimsToKeep.push_back(i);
+  }   
+  this->grad = grad.sum(dimsToKeep);
+}
 void Value::backward() {
   std::cout << "begin bw \n";
   auto start = std::chrono::steady_clock::now();
@@ -121,49 +137,45 @@ void train(Model &model, Value* inputs,
     std::cout << "############## step no :" << i << "\n";
     model.zeroGrad();
 
-      auto start_time = std::chrono::steady_clock::now();
+    auto start_time = std::chrono::steady_clock::now();
 
-      auto creation_time = std::chrono::steady_clock::now();
-      loss->forward();
-      auto forward_time = std::chrono::steady_clock::now();
+    auto creation_time = std::chrono::steady_clock::now();
+    loss->forward();
+    auto forward_time = std::chrono::steady_clock::now();
 
-      std::cout << "loss for input " << "is :" << loss->data.get()
-                << "guess was : [";
-      /*
-      int target_val = 0;
-      for (int k = 0; k < 10; k++) {
-        std::cout << output->data.get({k, 0}) << ",";
-        if (targets[j]->data.get({k, 0}) == 1)
-          target_val = k;
-      }
-      
-      std::cout << "] expected was: " << target_val << "\n";
-      */
-      loss->backward();
-      auto backward_time = std::chrono::steady_clock::now();
+    std::cout << "loss for input " << "is :" << loss->data.get()
+              << "guess was : [";
+    /*
+    int target_val = 0;
+    for (int k = 0; k < 10; k++) {
+      std::cout << output->data.get({k, 0}) << ",";
+      if (targets[j]->data.get({k, 0}) == 1)
+        target_val = k;
+    }
+    
+    std::cout << "] expected was: " << target_val << "\n";
+    */
+    loss->backward();
+    auto backward_time = std::chrono::steady_clock::now();
 
-      auto creation_duration =
-          std::chrono::duration_cast<std::chrono::milliseconds>(creation_time -
-                                                                start_time);
-      auto forward_duration =
-          std::chrono::duration_cast<std::chrono::milliseconds>(forward_time -
-                                                                creation_time);
-      auto backward_duration =
-          std::chrono::duration_cast<std::chrono::milliseconds>(backward_time -
-                                                                forward_time);
-      // std::cout << "creation took: " << creation_duration.count() << "forward
-      // took : " << forward_duration.count() << "backward took : " <<
-      // backward_duration.count() << "\n";
-      std::cout << "ajusting params \n";
-      for (Value *v : model.params()) {
-        v->print();
-        v->data = v->data - v->grad * alpha;
+    auto creation_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(creation_time -
+                                                              start_time);
+    auto forward_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(forward_time -
+                                                              creation_time);
+    auto backward_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(backward_time -
+                                                              forward_time);
+    std::cout << "creation took: " << creation_duration.count() << "forward took : " << forward_duration.count() << "backward took : " << backward_duration.count() << "\n";
+    std::cout << "ajusting params \n";
+    for (Value *v : model.params()) {
+      v->print();
+      v->reduce();
+      v->data = v->data - v->grad * alpha;
     }
 
     auto end = std::chrono::steady_clock::now();
-    auto duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Training took " << duration.count() << " ms." << "\n";
   }
 }
 
