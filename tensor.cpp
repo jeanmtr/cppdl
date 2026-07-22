@@ -3,10 +3,12 @@ Tensor::Tensor(const std::vector<int> &shape) {
   // jsp si faut pas bloquer le cas {}
   this->shape = shape;
   for (int i = 0; i < shape.size(); i++) {
+    assert(shape[i] != 0);
     if (i == 0) {
       stride.push_back(1);
     } else {
       stride.push_back(stride[i - 1] * shape[i - 1]);
+
     }
   }
   dim = shape.empty() ? 1 : stride.back() * shape.back();
@@ -82,7 +84,7 @@ void iterate(const std::vector<int> &shape, const std::vector<int> &stride,
   }
 }
 
-int Tensor::effectiveDim(){
+int Tensor::effectiveDim() const{
   int dim = this->shape.size();
   int trailingOnes = 0;
   while(this->shape[trailingOnes] == 1){
@@ -90,76 +92,111 @@ int Tensor::effectiveDim(){
   }
   return dim - trailingOnes;
 }
-// this is a specific case but idk if broader case is needed.
-// i should use exceptions but idk how to use them yet
-//  there might be an issue if dim > newDim but idk how that might happen
-Tensor Tensor::broadcast(const std::vector<int> &shape) const {
-  int dim = this->shape.size();
-  int newDim = shape.size();
-  bool oneFlag = false;
-  int firstOne = newDim - dim;
-  for (int i = 1; i <= dim; i++) {
-    if (this->shape[dim - i] == shape[newDim - i] && !oneFlag) {
-      std::cout << "a\n";
-    } else if (this->shape[dim - i] == 1) { // why am i checking this
-      if (!oneFlag) {
-        oneFlag = true;
-        firstOne = dim - i + 1;
-      }
-    } else {
-      std::cout << "could not broadcast tensors. \n ";
+// until is used to ignore the n last dims (ex: for matmul )
+// this is not deffensive at all, shapes and strides should be cleared
+// also until should be checked
+void Tensor::broadcast(const Tensor& other, int until, Tensor* out1, Tensor* out2) const{
+  //std::cout << "br en cours\n";
+  int dimThis = this->shape.size();
+  int dimOther= other.shape.size();
+  int outDim = std::max(dimThis,dimOther);
+  int smallDim = std::min(dimThis,dimOther);
+  bool thisIsSmaller = dimOther==outDim;
+  int thisOffset = outDim - dimThis;
+  int otherOffset = outDim - dimOther;
+
+  assert(smallDim >= until);
+
+
+  if (thisIsSmaller){
+    out1->stride.insert(out1->stride.begin(),thisOffset,0);
+  }
+  else{
+    out2->stride.insert(out2->stride.begin(),otherOffset,0);
+  }
+  out1->stride.insert(out1->stride.end(),this->stride.begin(),this->stride.end());
+  out2->stride.insert(out2->stride.end(),other.stride.begin(),other.stride.end());
+  // first part
+  for(int i = 0; i<outDim-smallDim; i++){
+    if(thisIsSmaller){
+      out1->shape.push_back(other.shape[i]);
+      out2->shape.push_back(other.shape[i]);
+    }
+    else{
+      out1->shape.push_back(this->shape[i]);
+      out2->shape.push_back(this->shape[i]);
+    }
+  }
+  //seconde part (main part)
+  for(int i = outDim-smallDim; i<outDim-until; i++){
+    int dim1,dim2;
+      dim1 = this->shape[i-thisOffset];
+      dim2 = other.shape[i-otherOffset];
+      
+    if (dim1 == 1){
+      out1->shape.push_back(dim2);
+      out2->shape.push_back(dim2);
+      out1->stride[i] = 0;
+    }
+    else if (dim2== 1){
+      out1->shape.push_back(dim1);
+      out2->shape.push_back(dim1);
+      out2->stride[i] = 0;
+    }
+    else if (dim1 == dim2){
+      out1->shape.push_back(dim1);
+      out2->shape.push_back(dim2);
+    }
+    else{
+      std::cout << "could not broadcast shapes !" << dim1 << "!=" << dim2 << "\n";
       std::exit(1);
     }
   }
-  Tensor out(shape); // there might be a problem with the copy TODO
-  out.data = this->data;
-  for (int i = 0; i < firstOne; i++) {
-    out.stride[i] = 0;
+  //third part (ignored by until) (mainly for matrices)
+  for(int i = outDim-until; i<outDim; i++ ){
+      out1->shape.push_back(this->shape[i-thisOffset]);
+      out2->shape.push_back(other.shape[i-otherOffset]);
   }
-  return out;
+
+  out1->data = this->data;
+  out2->data = other.data;
+  // std::cout << "br finie\n";
 }
+
+
 
 // TODO: do try catch block for broadcasting,
 // rn we only broadcast other so first arg will always be the final shape
 Tensor Tensor::operator+(const Tensor &other) {
-  int other_dim = other.shape.size();
-  Tensor broadcasted = other;
-  if (other_dim == this->shape.size()) {
-    for (int i = 0; i < other_dim; i++) {
-      if (other.shape[i] != this->shape[i]) {
-        broadcasted = other.broadcast(this->shape);
-        break;
-      }
-    }
-  } else
-    broadcasted = other.broadcast(this->shape);
-  Tensor out(this->shape);
+
+  Tensor* br1 = new Tensor();
+  Tensor* br2 = new Tensor();
+  this->broadcast(other, 0, br1, br2);
+  Tensor out(br1->shape);
   iterate(this->shape, this->stride,
           [&](int offset, const std::vector<int> &x) {
-            out.get(x) = this->get(x) + broadcasted.get(x);
+            out.get(x) = br1->get(x) + br2->get(x);
           });
+  delete br1;
+  delete br2;
   return out;
 }
 
 Tensor Tensor::operator-(const Tensor &other) {
-  int other_dim = other.shape.size();
-  Tensor broadcasted = other;
-  if (other_dim == this->shape.size()) {
-    for (int i = 0; i < other_dim; i++) {
-      if (other.shape[i] != this->shape[i]) {
-        broadcasted = other.broadcast(this->shape);
-        break;
-      }
-    }
-  } else
-    broadcasted = other.broadcast(this->shape);
-  Tensor out(this->shape);
+
+  Tensor* br1 = new Tensor();
+  Tensor* br2 = new Tensor();
+  this->broadcast(other, 0, br1, br2);
+  Tensor out(br1->shape);
   iterate(this->shape, this->stride,
           [&](int offset, const std::vector<int> &x) {
-            out.get(x) = this->get(x) - broadcasted.get(x);
+            out.get(x) = br1->get(x) - br2->get(x);
           });
+  delete br1;
+  delete br2;
   return out;
 }
+
 Tensor Tensor::operator-() {
   Tensor out(this->shape);
   iterate(this->shape, this->stride,
@@ -186,45 +223,50 @@ Tensor Tensor::operator*(const double other) {
 }
 Tensor Tensor::operator*(const Tensor &other) {
   int other_dim = other.shape.size();
-  Tensor broadcasted = other;
-  if (other_dim == this->shape.size()) {
-    for (int i = 0; i < other_dim; i++) {
-      if (other.shape[i] != this->shape[i]) {
-        broadcasted = other.broadcast(this->shape);
-        break;
-      }
-    }
-  } else {
-    broadcasted = other.broadcast(this->shape);
-  }
-  Tensor out(this->shape);
+
+  Tensor* br1 = new Tensor();
+  Tensor* br2 = new Tensor();
+  this->broadcast(other, 0, br1, br2);
+  Tensor out(br1->shape);
   iterate(this->shape, this->stride,
           [&](int offset, const std::vector<int> &x) {
-            out.get(x) = this->get(x) * broadcasted.get(x);
+            out.get(x) = br1->get(x) * br2->get(x);
           });
+  delete br1;
+  delete br2;
   return out;
 }
-
 // TODO implement matrix multiplication but for tensors (repeating matrix mult)
 Tensor Tensor::mm(const Tensor &other) {
-  assert(this->shape.size() == 2 && other.shape.size() >= 2);
-  int otherDim = other.shape.size();
-  if (otherDim > 2) {
-    std::cout << "other dim is :" << otherDim << "doing broadcasting \n";
-  }
-  int n = this->shape[1];
-  assert(this->shape[1] == other.shape[otherDim - 2]);
-  std::vector<int> newShape = other.shape;
-  newShape[otherDim - 2] = this->shape[0];
+  assert(this->shape.size() >= 2 && other.shape.size() >= 2);
+  std::cout << "mming \n";
+
+  int ed1 = this->effectiveDim();
+  int ed2 = other.effectiveDim();
+  Tensor* mat1_broadcasted = new Tensor(); 
+  Tensor* mat2_broadcasted = new Tensor();
+
+  this->broadcast(other, 2, mat1_broadcasted, mat2_broadcasted);
+  int otherDim = mat2_broadcasted->shape.size();
+  int k = mat1_broadcasted->shape[otherDim-1];
+  assert(k == mat2_broadcasted->shape[otherDim - 2]);
+  std::vector<int> newShape = mat2_broadcasted->shape;
+  newShape[otherDim - 2] = mat1_broadcasted->shape[otherDim -2];
   Tensor out(newShape);
   iterate(out.shape, out.stride, [&](int offset, const std::vector<int> &x) {
-    for (int i = 0; i < n; i++) {
-      // std::cout << x[0] << "," << x[1] << "," << i << "\n";
-      std::vector<int> otherPos = x;
+    for (int i = 0; i < k; i++) {
+      //std::cout << x[otherDim -1] << "," << x[otherDim - 2] << "," << i << "\n";
+      std::vector<int> otherPos = x; //this is slow asf need to change soon
       otherPos[otherDim-2] = i;
-      out.get(x) += this->get({x[otherDim - 2], i}) * other.get(otherPos);
+      std::vector<int> thisPos= x;
+      thisPos[otherDim-1] = i;
+      out.get(x) += mat1_broadcasted->get(thisPos) * mat2_broadcasted->get(otherPos);
     }
   });
+  delete mat1_broadcasted;
+  delete mat2_broadcasted;
+
+  std::cout << "mming done \n";
   return out;
 }
 
@@ -253,6 +295,16 @@ Tensor Tensor::sigmoidDeriv() {
 }
 
 Tensor Tensor::sum() {
+  double acc = 0;
+  iterate(this->shape, this->stride,
+          [&](int offset, const std::vector<int> &x) { acc += this->get(x); });
+  Tensor out;
+  out.get() = acc;
+  return out;
+}
+
+//axes should be a set but who likes sets ?
+Tensor Tensor::sum(std::vector<int> axes) {
   double acc = 0;
   iterate(this->shape, this->stride,
           [&](int offset, const std::vector<int> &x) { acc += this->get(x); });

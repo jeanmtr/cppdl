@@ -19,7 +19,7 @@ class Tensor{
      const double& get(const std::vector<int>& pos) const;
      double& get();
      const double& get() const;
-     int effectiveDim();
+     int effectiveDim() const;
      //double get(vector<int> pos); idk
      Tensor operator+(const Tensor& other);
      Tensor operator+(const double other);
@@ -34,7 +34,7 @@ class Tensor{
      Tensor sigmoidDeriv();
      void printShape();
      Tensor transpose();
-     Tensor broadcast(const std::vector<int>& shape) const;
+     void broadcast(const Tensor& other, int until, Tensor* out1, Tensor* out2) const;
      void fillRandom();
 };
 

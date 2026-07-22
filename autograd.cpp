@@ -33,6 +33,7 @@ void Value::topo_sort(std::set<Value *> *visited,
   sorted->push_back(this);
 }
 void Value::backward() {
+  std::cout << "begin bw \n";
   auto start = std::chrono::steady_clock::now();
   std::set<Value *> visited;
   std::vector<Value *> sorted;
@@ -42,14 +43,14 @@ void Value::backward() {
   this->grad = Tensor();
   grad.get() = 1.0;
   std::reverse(sorted.begin(), sorted.end());
+  for (Value *v : sorted) {
+    v->print();
+    v->op->backward(v, v->children);
+  }
   auto end = std::chrono::steady_clock::now();
   auto bw_duration =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   std::cout << "bw duration (ms): " << bw_duration.count() << "\n";
-  for (Value *v : sorted) {
-    // v->print();
-    v->op->backward(v, v->children);
-  }
 }
 
 void Value::forward() {
@@ -153,9 +154,10 @@ void train(Model &model, Value* inputs,
       // std::cout << "creation took: " << creation_duration.count() << "forward
       // took : " << forward_duration.count() << "backward took : " <<
       // backward_duration.count() << "\n";
-    
-    for (Value *v : model.params()) {
-      v->data = v->data - v->grad * alpha;
+      std::cout << "ajusting params \n";
+      for (Value *v : model.params()) {
+        v->print();
+        v->data = v->data - v->grad * alpha;
     }
 
     auto end = std::chrono::steady_clock::now();
