@@ -54,8 +54,7 @@ void Value::backward() {
   std::set<Value *> visited;
   std::vector<Value *> sorted;
   this->topo_sort(&visited, &sorted);
-  // for (Value* v : sorted) v->grad = Tensor(); // set to 0, this might cause
-  // brodcasting issues later
+  for (Value* v : sorted) v->grad = Tensor();
   this->grad = Tensor();
   grad.get() = 1.0;
   std::reverse(sorted.begin(), sorted.end());
@@ -129,7 +128,7 @@ Value *Value::power(double expo) {
 void train(Model &model, Value* inputs,
            Value* targets, int nSteps, LossFn loss_fun) {
   auto start = std::chrono::steady_clock::now();
-  double alpha = 0.0005;
+  double alpha = 0.005;
   Value *output =
       model.create(inputs); // this does not work, faut changer
   Value *loss = loss_fun(output, targets);
