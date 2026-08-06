@@ -54,13 +54,20 @@ void Value::backward() {
   std::set<Value *> visited;
   std::vector<Value *> sorted;
   this->topo_sort(&visited, &sorted);
-  for (Value* v : sorted) v->grad = Tensor();
+  for (Value* v : sorted) v->grad = Tensor(); // we zero everything before bw
   this->grad = Tensor();
   grad.get() = 1.0;
   std::reverse(sorted.begin(), sorted.end());
   for (Value *v : sorted) {
     v->print();
+    auto before_backward = std::chrono::steady_clock::now();
+
     v->op->backward(v, v->children);
+    auto after_backward = std::chrono::steady_clock::now();
+    auto duration =
+      std::chrono::duration_cast<std::chrono::milliseconds>(after_backward - before_backward);
+    
+    std::cout << "duration was :" << duration.count() << '\n';
   }
   auto end = std::chrono::steady_clock::now();
   auto bw_duration =

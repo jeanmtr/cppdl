@@ -240,7 +240,8 @@ Tensor Tensor::operator*(const Tensor &other) {
 // TODO implement matrix multiplication but for tensors (repeating matrix mult)
 Tensor Tensor::mm(const Tensor &other) {
   assert(this->shape.size() >= 2 && other.shape.size() >= 2);
-  std::cout << "mming \n";
+  
+  auto start = std::chrono::steady_clock::now();
 
   int ed1 = this->effectiveDim();
   int ed2 = other.effectiveDim();
@@ -254,20 +255,37 @@ Tensor Tensor::mm(const Tensor &other) {
   std::vector<int> newShape = mat2_broadcasted->shape;
   newShape[otherDim - 2] = mat1_broadcasted->shape[otherDim -2];
   Tensor out(newShape);
+  auto prep = std::chrono::steady_clock::now();
+  auto duration =
+    std::chrono::duration_cast<std::chrono::milliseconds>(prep - start);
+  
+  std::cout << "prep took  :" << duration.count() << '\n';
+  std::cout << k;
   iterate(out.shape, out.stride, [&](int offset, const std::vector<int> &x) {
     for (int i = 0; i < k; i++) {
+
+      auto loop_start = std::chrono::steady_clock::now();
       //std::cout << x[otherDim -1] << "," << x[otherDim - 2] << "," << i << "\n";
       std::vector<int> otherPos = x; //this is slow asf need to change soon
       otherPos[otherDim-2] = i;
       std::vector<int> thisPos= x;
       thisPos[otherDim-1] = i;
       out.get(x) += mat1_broadcasted->get(thisPos) * mat2_broadcasted->get(otherPos);
+      auto loop_end = std::chrono::steady_clock::now();
+      auto duration2 =
+        (loop_end - loop_start);
+  
+      //std::cout << "one iteration took  :" << duration2.count() << '\n';
     }
   });
   delete mat1_broadcasted;
   delete mat2_broadcasted;
 
-  std::cout << "mming done \n";
+  auto end = std::chrono::steady_clock::now();
+  duration =
+    std::chrono::duration_cast<std::chrono::milliseconds>(end- start);
+  
+  std::cout << "mm took  :" << duration.count() << '\n';
   return out;
 }
 
