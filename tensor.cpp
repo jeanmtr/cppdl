@@ -249,40 +249,34 @@ Tensor Tensor::mm(const Tensor &other) {
   Tensor* mat2_broadcasted = new Tensor();
 
   this->broadcast(other, 2, mat1_broadcasted, mat2_broadcasted);
-  int otherDim = mat2_broadcasted->shape.size();
-  int k = mat1_broadcasted->shape[otherDim-1];
-  assert(k == mat2_broadcasted->shape[otherDim - 2]);
+  int dim = mat2_broadcasted->shape.size();
+  int k = mat1_broadcasted->shape[dim-1];
+  assert(k == mat2_broadcasted->shape[dim - 2]);
   std::vector<int> newShape = mat2_broadcasted->shape;
-  newShape[otherDim - 2] = mat1_broadcasted->shape[otherDim -2];
+  newShape[dim - 2] = mat1_broadcasted->shape[dim -2];
   Tensor out(newShape);
-  auto prep = std::chrono::steady_clock::now();
-  auto duration =
-    std::chrono::duration_cast<std::chrono::milliseconds>(prep - start);
   
-  std::cout << "prep took  :" << duration.count() << '\n';
-  std::cout << k;
+  int thisMovingStride = mat1_broadcasted->stride[dim-1]; 
+  int otherMovingStride = mat2_broadcasted->stride[dim-2]; 
   iterate(out.shape, out.stride, [&](int offset, const std::vector<int> &x) {
+    int thisPos =0 ,otherPos = 0;
+    for(int i = 0; i<dim; i++){
+      otherPos += x[i]*mat2_broadcasted->stride[i];
+      thisPos += x[i]*mat1_broadcasted->stride[i];
+    }
+
+    thisPos -= x[dim-1]*thisMovingStride;
+    otherPos -= x[dim-2]*otherMovingStride;
     for (int i = 0; i < k; i++) {
 
-      auto loop_start = std::chrono::steady_clock::now();
-      //std::cout << x[otherDim -1] << "," << x[otherDim - 2] << "," << i << "\n";
-      std::vector<int> otherPos = x; //this is slow asf need to change soon
-      otherPos[otherDim-2] = i;
-      std::vector<int> thisPos= x;
-      thisPos[otherDim-1] = i;
-      out.get(x) += mat1_broadcasted->get(thisPos) * mat2_broadcasted->get(otherPos);
-      auto loop_end = std::chrono::steady_clock::now();
-      auto duration2 =
-        (loop_end - loop_start);
-  
-      //std::cout << "one iteration took  :" << duration2.count() << '\n';
+      (*out.data)[offset] += (*mat1_broadcasted->data)[thisPos + thisMovingStride*i] * (*mat2_broadcasted->data)[otherPos + otherMovingStride*i];
     }
   });
   delete mat1_broadcasted;
   delete mat2_broadcasted;
 
   auto end = std::chrono::steady_clock::now();
-  duration =
+  auto duration =
     std::chrono::duration_cast<std::chrono::milliseconds>(end- start);
   
   std::cout << "mm took  :" << duration.count() << '\n';

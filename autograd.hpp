@@ -47,7 +47,6 @@ class Value{
       void reduce();
 };
 
-using LossFn = std::function<Value*(Value*, Value*)>;
 
 
 
@@ -151,25 +150,30 @@ public:
     Value* b3;
 
     MLP() {
-        w1 = new Value(Tensor({128,784}), "w1");
-        w2 = new Value(Tensor({10,128}), "w2");
-        b1 = new Value(Tensor({128,1}), "b1");
-        b2 = new Value(Tensor({10,1}), "b2");
+        w1 = new Value(Tensor({32,784}), "w1");
+        w2 = new Value(Tensor({32,32}), "w1");
+        w3 = new Value(Tensor({10,32}), "w3");
+        b1 = new Value(Tensor({32,1}), "b1");
+        b2 = new Value(Tensor({32,1}), "b2");
+        b3 = new Value(Tensor({10,1}), "b3");
         w1->data.fillRandom();
         w2->data.fillRandom();
+        w3->data.fillRandom();
         b1->data.fillRandom();
         b2->data.fillRandom();
+        b3->data.fillRandom();
     }
 
     Value* create(Value* input) override {
-        return w2->mm(w1->mm(input)->add(b1)->sigmoid())->add(b2)->sigmoid();
+        return w3->mm(w2->mm(w1->mm(input)->add(b1)->sigmoid())->add(b2)->sigmoid())->add(b3)->sigmoid();
     }
 
     std::vector<Value*> params() override {
-        return {w1, w2, b1, b2};
+        return {w1, w2, w3, b1, b2, b3};
     }
 
 };
 
 
+using LossFn = std::function<Value*(Value*, Value*, Model&)>;
 void train(Model& model, std::vector<Value*> inputs, std::vector<Value*> targets, int nSteps, LossFn loss_fun);

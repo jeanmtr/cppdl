@@ -131,14 +131,15 @@ Value *Value::power(double expo) {
   out->children = {this};
   return out;
 }
-// TODO: implement batching bc this is sad
+
+
 void train(Model &model, Value* inputs,
            Value* targets, int nSteps, LossFn loss_fun) {
   auto start = std::chrono::steady_clock::now();
   double alpha = 0.005;
   Value *output =
       model.create(inputs); // this does not work, faut changer
-  Value *loss = loss_fun(output, targets);
+  Value *loss = loss_fun(output, targets, model);
   for (int i = 0; i < nSteps; i++) {
     std::cout << "############## step no :" << i << "\n";
     model.zeroGrad();
@@ -236,9 +237,13 @@ Dataset mnistToValue(int trainLen) {
 
 void testTrain() {
   Dataset ds = mnistToValue(100);
-  LossFn mse = [](Value *pred, Value *target) {
-    Value *diff = pred->sub(target)->power(2)->sum();
-    return diff; // (pred - target)²
+  LossFn mse = [](Value *pred, Value *target, Model&  model) {
+    Value* l2_reg = new Value(Tensor());
+    for(Value* v: model.params()){
+      l2_reg = l2_reg->add(v->power(2)->sum()); //c'est un peu cheum en terme de graphe je crois
+    }
+    Value* diff = pred->sub(target)->power(2)->sum();
+    return diff->add(l2_reg); // (pred - target)²
   };
   std::cout << "[+] defining the model \n";
   MLP model;
